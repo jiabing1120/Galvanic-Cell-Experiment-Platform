@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数字小极客：原电池虚拟交互实验室</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI','Microsoft YaHei',sans-serif; }
+
+        body {
+            background: linear-gradient(135deg,#0a1628,#0d2847 30%,#1a365d 70%,#0f172a);
+            color:#e2e8f0; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:30px;
+        }
+
+        .lab-container {
+            width:100%; max-width:1600px; min-height:85vh;
+            background: linear-gradient(145deg,rgba(20,35,60,0.98),rgba(15,25,45,0.98));
+            border-radius:24px;
+            box-shadow:0 25px 60px rgba(0,0,0,0.6),0 10px 25px rgba(0,0,0,0.4),0 0 0 1px rgba(255,255,255,0.08),inset 0 1px 0 rgba(255,255,255,0.1);
+            display:grid; grid-template-columns:300px 1.5fr 380px; grid-template-rows:auto 1fr; row-gap:16px; column-gap:24px; padding:20px 30px 30px; overflow:hidden; position:relative;
+        }
+
+        .lab-title {
+            grid-column:1/-1; text-align:center;
+            font-size:2.2rem; font-weight:800; color:#60a5fa;
+            text-shadow:0 0 30px rgba(96,165,250,0.4),0 0 60px rgba(96,165,250,0.15);
+            letter-spacing:8px; padding:4px 0 8px 0;
+            border-bottom:1px solid rgba(96,165,250,0.12);
+            font-family:'Microsoft YaHei','Segoe UI',sans-serif;
+        }
+
+        .lab-container::before {
+            content:''; position:absolute; top:0; left:0; right:0; height:1px;
+            background: linear-gradient(90deg,transparent,rgba(96,165,250,0.3),rgba(34,211,238,0.3),rgba(96,165,250,0.3),transparent);
+        }
+
+        /* 左侧面板 */
+        .control-panel {
+            background:linear-gradient(180deg,rgba(35,55,85,0.9),rgba(25,45,75,0.9));
+            border-radius:18px; padding:28px; backdrop-filter:blur(12px);
+            border:1px solid rgba(255,255,255,0.12);
+            box-shadow:0 8px 20px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.1),inset 0 -1px 0 rgba(0,0,0,0.2);
+            display:flex; flex-direction:column; height:100%;
+        }
+        .panel-title { font-size:1.5rem; font-weight:700; color:#60a5fa; margin-bottom:28px; text-align:center; text-shadow:0 0 15px rgba(96,165,250,0.4); padding-bottom:15px; border-bottom:2px solid rgba(96,165,250,0.2); }
+        .control-group { margin-bottom:28px; }
+        .control-label { display:block; color:#e2e8f0; margin-bottom:12px; font-size:1.05rem; font-weight:600; text-shadow:0 1px 2px rgba(0,0,0,0.3); }
+        .material-select { width:100%; padding:14px 18px; background:linear-gradient(180deg,rgba(12,25,45,0.95),rgba(8,18,35,0.95)); border:2px solid #3d5a80; border-radius:12px; color:#e2e8f0; font-size:1rem; cursor:pointer; transition:all 0.3s ease; box-shadow:0 4px 12px rgba(0,0,0,0.25),inset 0 1px 0 rgba(255,255,255,0.05); }
+        .material-select:hover { border-color:#60a5fa; box-shadow:0 0 20px rgba(96,165,250,0.3),inset 0 1px 0 rgba(255,255,255,0.08); transform:translateY(-1px); }
+        .material-select:focus { outline:none; border-color:#3b82f6; box-shadow:0 0 25px rgba(59,130,246,0.4),inset 0 1px 0 rgba(255,255,255,0.1); }
+        .material-select option { background:#0f1a2e; color:#e2e8f0; }
+
+        .activity-order {
+            background:linear-gradient(180deg,rgba(15,30,55,0.7),rgba(10,20,40,0.7));
+            border-radius:14px; padding:18px; margin-top:25px;
+            border:1px solid rgba(255,255,255,0.08);
+            box-shadow:0 6px 16px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.05); flex-shrink:0;
+        }
+        .activity-order h3 { color:#fbbf24; margin-bottom:12px; font-size:1.05rem; text-shadow:0 0 10px rgba(251,191,36,0.5); }
+        .order-list { display:flex; justify-content:space-between; font-size:0.9rem; color:#cbd5e1; background:rgba(0,0,0,0.2); border-radius:10px; padding:10px 4px; }
+        .order-item { text-align:center; flex:1; padding:6px 2px; border-radius:6px; transition:all 0.3s ease; font-size:0.85rem; }
+        .order-item.active { color:#22d3ee; font-weight:700; text-shadow:0 0 12px rgba(34,211,238,0.6); background:rgba(34,211,238,0.15); box-shadow:0 0 15px rgba(34,211,238,0.3); }
+        .activity-arrow { height:14px; margin-top:12px; border-radius:7px; background:linear-gradient(90deg,#ff3333,#ff7700 15%,#ffcc00 30%,#88cc44 50%,#44aadd 70%,#8888cc 85%,#6666aa); box-shadow:0 0 8px rgba(255,100,0,0.3),inset 0 1px 0 rgba(255,255,255,0.15); position:relative; }
+        .activity-arrow::after { content:'▶'; position:absolute; right:-6px; top:50%; transform:translateY(-50%); font-size:0.7rem; color:#6666aa; }
+
+        /* ===== 仿真区 ===== */
+        .simulation-area {
+            position:relative; display:flex; align-items:center; justify-content:center;
+            background:linear-gradient(180deg,rgba(10,30,55,0.3),rgba(15,40,70,0.2));
+            border-radius:18px; border:1px solid rgba(255,255,255,0.08);
+            box-shadow:inset 0 2px 10px rgba(0,0,0,0.2),inset 0 -2px 10px rgba(255,255,255,0.03);
+            padding:120px 90px; overflow:visible;
+        }
+
+        /* 正极/负极侧标 - 靠近烧杯 */
+        .pole-side-label {
+            position:absolute; top:50%; transform:translateY(-50%);
+            font-size:1.4rem; font-weight:800; z-index:20;
+            padding:12px 10px; border-radius:8px;
+            writing-mode:vertical-lr; letter-spacing:4px;
+            text-shadow:0 0 12px currentColor; pointer-events:none;
+        }
+        .pole-side-label.side-left { left:calc(50% - 252px); }
+        .pole-side-label.side-right { right:calc(50% - 252px); }
+        .pole-side-label.is-negative {
+            color:#fbbf24;
+            background:rgba(251,191,36,0.08); border:1px solid rgba(251,191,36,0.2);
+            box-shadow:0 0 15px rgba(251,191,36,0.1);
+        }
+        .pole-side-label.is-positive {
+            color:#60a5fa;
+            background:rgba(96,165,250,0.08); border:1px solid rgba(96,165,250,0.2);
+            box-shadow:0 0 15px rgba(96,165,250,0.1);
+        }
+
+        /* 电流显示器 - 在烧杯容器内，灯泡上方 */
+        .current-display-top {
+            position:absolute; top:-10px; left:50%; transform:translateX(-50%);
+            background:linear-gradient(180deg,rgba(5,25,15,0.95),rgba(0,15,10,0.95));
+            padding:3px 18px; border-radius:8px; border:1px solid #10b981;
+            box-shadow:0 0 12px rgba(16,185,129,0.3),inset 0 0 6px rgba(16,185,129,0.1),0 2px 6px rgba(0,0,0,0.3);
+            z-index:25; text-align:center; white-space:nowrap; line-height:1.2;
+        }
+        .current-display-top .c-label { display:inline; color:#10b981; font-size:11pt; letter-spacing:2px; font-weight:600; text-shadow:0 0 4px rgba(16,185,129,0.7); margin-right:5px; }
+        .current-display-top .c-value { display:inline; font-family:'Courier New',monospace; font-size:15pt; font-weight:700; color:#10b981; text-shadow:0 0 8px rgba(16,185,129,1),0 0 15px rgba(16,185,129,0.4); transition:all 0.3s ease; }
+
+        .beaker-container {
+            position:relative; width:360px; height:480px;
+            transform:scale(1.5); transform-origin:center center;
+        }
+
+        /* 烧杯 */
+        .beaker-glass {
+            position:absolute; bottom:0; left:50%; transform:translateX(-50%);
+            width:280px; height:380px;
+            background:linear-gradient(145deg,rgba(255,255,255,0.18),rgba(255,255,255,0.08) 30%,transparent 70%);
+            border-radius:24px 24px 140px 140px;
+            border:5px solid rgba(255,255,255,0.35);
+            box-shadow:inset 0 0 50px rgba(255,255,255,0.12),0 15px 40px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.15),inset 0 -10px 30px rgba(0,0,0,0.1);
+            overflow:hidden; z-index:2;
+        }
+
+        .electrolyte {
+            position:absolute; bottom:0; left:0; width:100%; height:75%;
+            border-radius:0 0 136px 136px;
+            box-shadow:inset 0 15px 30px rgba(255,255,255,0.35),inset 0 -10px 20px rgba(0,0,0,0.25),inset 0 0 50px rgba(0,0,0,0.08);
+            transition:background 0.6s ease;
+        }
+        .electrolyte::before {
+            content:''; position:absolute; top:0; left:0; width:100%; height:25px;
+            background:linear-gradient(90deg,transparent,rgba(255,255,255,0.25) 50%,transparent);
+            animation:wave 3.5s linear infinite;
+        }
+        .electrolyte::after {
+            content:''; position:absolute; top:8px; left:0; width:100%; height:15px;
+            background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15) 50%,transparent);
+            animation:wave 5s linear infinite reverse;
+        }
+        @keyframes wave { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+
+        /* 光泽 */
+        .lab-container::after {
+            content:''; position:absolute; top:0; left:0; right:0; height:50%;
+            background:linear-gradient(180deg,rgba(255,255,255,0.03),transparent);
+            pointer-events:none; border-radius:24px 24px 0 0;
+        }
+
+        /* 电极 - 加高让顶部伸出液面更多 */
+        .electrode {
+            position:absolute; width:24px; height:360px; bottom:40px; border-radius:10px;
+            transition:all 0.5s ease; z-index:3;
+            box-shadow:0 6px 16px rgba(0,0,0,0.4),inset 0 2px 4px rgba(255,255,255,0.3),inset 0 -2px 4px rgba(0,0,0,0.2);
+        }
+        .electrode-left { left:35%; transform:translateX(-50%); }
+        .electrode-right { left:65%; transform:translateX(-50%); }
+
+        /* 电极标签 - 在电极顶部上方，不被遮盖 */
+        .electrode-label {
+            position:absolute; top:50px; left:50%; transform:translateX(-50%);
+            background:linear-gradient(180deg,rgba(15,25,45,0.95),rgba(10,18,35,0.95));
+            color:white; font-weight:bold; font-size:1.2rem; padding:6px 14px; border-radius:8px;
+            border:2px solid rgba(255,255,255,0.25);
+            box-shadow:0 4px 12px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.1);
+            z-index:6; white-space:nowrap; font-family:'Courier New',monospace;
+            text-shadow:0 2px 4px rgba(0,0,0,0.5);
+        }
+        .electrode-label-left { left:35%; }
+        .electrode-label-right { left:65%; }
+
+        /* 电极材质 */
+        .electrode-mg { background:linear-gradient(135deg,#fafafa,#f0f0f0 20%,#e0e0e0 40%,#d0d0d0 60%,#c0c0c0 80%,#b0b0b0); box-shadow:inset 0 2px 8px rgba(255,255,255,0.8),inset 0 -2px 8px rgba(0,0,0,0.1),0 6px 20px rgba(255,255,255,0.3); }
+        .electrode-al { background:linear-gradient(135deg,#e8e8e8,#d0d0d0 20%,#b8b8b8 40%,#a0a0a0 60%,#888888 80%,#707070); box-shadow:inset 0 2px 6px rgba(255,255,255,0.6),inset 0 -2px 6px rgba(0,0,0,0.15),0 6px 18px rgba(200,200,200,0.25); }
+        .electrode-zn { background:linear-gradient(135deg,#d0d0d5,#b8b8bd 20%,#a0a0a5 40%,#88888d 60%,#707075 80%,#58585d); box-shadow:inset 0 2px 5px rgba(255,255,255,0.5),inset 0 -2px 5px rgba(0,0,0,0.2),0 6px 16px rgba(180,180,180,0.2); }
+        .electrode-fe { background:linear-gradient(135deg,#7a7570,#6a6560 20%,#5a5550 40%,#4a4540 60%,#3a3530 80%,#2a2520); box-shadow:inset 0 2px 4px rgba(255,255,255,0.3),inset 0 -2px 4px rgba(0,0,0,0.4),0 6px 14px rgba(100,100,100,0.15); }
+        .electrode-cu { background:linear-gradient(135deg,#c97022,#b86018 20%,#a75012 40%,#964010 60%,#85300c 80%,#742008); box-shadow:inset 0 2px 6px rgba(255,200,100,0.4),inset 0 -2px 6px rgba(0,0,0,0.3),0 6px 18px rgba(200,120,50,0.35); }
+        .electrode-ag { background:linear-gradient(135deg,#f5f8fa,#e8edf0 20%,#d5dce0 40%,#c0c8cc 60%,#aab0b5 80%,#949aa0); box-shadow:inset 0 2px 10px rgba(255,255,255,0.9),inset 0 -2px 6px rgba(0,0,0,0.1),0 6px 20px rgba(200,210,220,0.35); }
+        .electrode-pb { background:linear-gradient(135deg,#6a6a70,#55555c 20%,#404048 40%,#35353c 60%,#2a2a30 80%,#1f1f24); box-shadow:inset 0 2px 4px rgba(180,180,200,0.3),inset 0 -2px 4px rgba(0,0,0,0.5),0 6px 14px rgba(80,80,100,0.15); }
+        .electrode-pt { background:linear-gradient(135deg,#d0d5dc,#b8c0c8 20%,#a0aab5 40%,#8895a0 60%,#707d88 80%,#586570); box-shadow:inset 0 2px 6px rgba(255,255,255,0.6),inset 0 -2px 6px rgba(0,0,0,0.2),0 6px 18px rgba(180,190,200,0.25); }
+        .electrode-c { background:linear-gradient(135deg,#3d3d42,#333338 20%,#2a2a2e 40%,#222226 60%,#1a1a1d 80%,#121214); box-shadow:inset 0 0 5px rgba(200,200,220,0.15),inset 0 0 15px rgba(100,100,120,0.1),0 6px 12px rgba(30,30,40,0.3); }
+
+        /* 粒子容器 */
+        .particles-container { position:absolute; width:100%; height:100%; pointer-events:none; z-index:4; }
+
+        .bubble {
+            position:absolute;
+            background:radial-gradient(circle at 30% 30%,rgba(255,255,255,0.9),rgba(255,255,255,0.6) 50%,rgba(255,255,255,0.3) 100%);
+            border-radius:50%; animation:bubble-rise linear infinite;
+            box-shadow:0 2px 6px rgba(0,0,0,0.15),inset 0 -2px 4px rgba(0,0,0,0.1),inset 0 2px 4px rgba(255,255,255,0.8);
+        }
+        @keyframes bubble-rise { 0%{transform:translateY(0)translateX(0)scale(0.3);opacity:0.85} 50%{opacity:0.6} 100%{transform:translateY(-180px)translateX(var(--offset,0))scale(0.9);opacity:0} }
+
+        .metal-ion { position:absolute; border-radius:50%; animation:ion-drift linear infinite; box-shadow:0 0 6px rgba(255,255,255,0.3),inset 0 0 3px rgba(255,255,255,0.5); }
+        @keyframes ion-drift { 0%{transform:translateY(0)translateX(0)scale(0.6);opacity:0.9} 30%{opacity:0.7} 60%{opacity:0.4} 100%{transform:translateY(-80px)translateX(var(--ion-drift-x,30px))scale(0.2);opacity:0} }
+
+        /* 离子迁移动画 - 电解质中离子定向移动 */
+        .ion-migration { position:absolute; bottom:30%; left:8%; right:8%; height:56px; z-index:5; pointer-events:none; }
+        .ion-direction { position:absolute; top:30px; left:0; right:0; text-align:center; font-size:3rem; color:rgba(0,0,0,0.8); z-index:1; pointer-events:none; letter-spacing:8px; font-weight:900; text-shadow:0 0 2px rgba(0,0,0,0.5),0 0 5px rgba(255,255,255,0.3),1px 1px 0 rgba(0,0,0,0.3); -webkit-text-stroke:1.5px rgba(0,0,0,0.5); paint-order:stroke fill; }
+        .ion-particle { position:absolute; top:0; font-size:0.85rem; font-weight:700; color:#fff; background:rgba(96,165,250,0.2); padding:1px 8px; border-radius:10px; border:1px solid rgba(255,255,255,0.25); white-space:nowrap; z-index:2; text-shadow:0 0 8px rgba(96,165,250,0.5); opacity:0; pointer-events:none; box-shadow:0 2px 6px rgba(0,0,0,0.15); }
+
+        /* ===== 简化电路系统 ===== */
+        .circuit-system {
+            position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:7;
+        }
+
+        .wire {
+            position:absolute; transition:background 0.4s ease, box-shadow 0.4s ease;
+            background:linear-gradient(90deg,#2a2a2a,#505050 50%,#2a2a2a);
+            box-shadow:0 2px 4px rgba(0,0,0,0.3);
+        }
+        .wire-dot {
+            position:absolute; width:13px; height:13px; border-radius:50%;
+            transition:background 0.4s ease, box-shadow 0.4s ease;
+            background:#444; box-shadow:0 2px 4px rgba(0,0,0,0.4);
+        }
+
+        /* 左右导线：从电极顶部斜向伸出到灯泡底部 */
+        .wire-left {
+            width:8px; height:55px; left:35%; top:74px;
+            transform:translateX(-50%) rotate(13deg);
+            transform-origin:bottom center; border-radius:5px;
+        }
+        .wire-right {
+            width:8px; height:55px; left:65%; top:74px;
+            transform:translateX(-50%) rotate(-13deg);
+            transform-origin:bottom center; border-radius:5px;
+        }
+        /* 水平短连线 - 桥接到灯泡底部 */
+        .wire-top-left {
+            height:6px; width:53px; left:37%; top:78px;
+            border-radius:3px;
+        }
+        .wire-top-right {
+            height:6px; width:53px; left:calc(50% - 2px); top:78px;
+            border-radius:3px;
+        }
+        .wire-dot-left { left:calc(37% + 47px); top:75px; }
+        .wire-dot-right { left:calc(50% - 13px); top:75px; }
+
+        /* 负极导线（黑色） */
+        .wire-neg {
+            background:linear-gradient(90deg,#111,#333 30%,#4a4a4a 50%,#333 70%,#111);
+            box-shadow:0 2px 5px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.06),inset 0 -1px 0 rgba(0,0,0,0.3);
+        }
+        .wire-dot.wire-neg { box-shadow:0 2px 4px rgba(0,0,0,0.5),inset 0 0 4px rgba(255,255,255,0.08); }
+
+        /* 正极导线（红色） */
+        .wire-pos {
+            background:linear-gradient(90deg,#5c0000,#a00 30%,#d40000 50%,#a00 70%,#5c0000);
+            box-shadow:0 2px 6px rgba(180,0,0,0.5),inset 0 1px 0 rgba(255,200,200,0.25),inset 0 -1px 0 rgba(0,0,0,0.25);
+        }
+        .wire-dot.wire-pos { box-shadow:0 2px 5px rgba(200,0,0,0.5),inset 0 0 5px rgba(255,200,200,0.3); }
+
+        /* 灯泡 - 位于导线交汇处上方 */
+        .bulb {
+            position:absolute; left:50%; top:56px; transform:translate(-50%,-50%);
+            font-size:52px; z-index:15;
+            transition:all 0.5s ease;
+            filter:drop-shadow(0 3px 6px rgba(0,0,0,0.3));
+            pointer-events:auto;
+            line-height:1;
+        }
+        .bulb-on {
+            text-shadow:0 0 20px #ffd700,0 0 40px #ffd700,0 0 60px #ffa500;
+            filter:drop-shadow(0 0 12px rgba(255,215,0,0.85));
+            opacity:1; transform:translate(-50%,-50%) scale(1.08);
+        }
+        .bulb-off {
+            opacity:0; filter:grayscale(1) brightness(0.3); text-shadow:none;
+            transform:translate(-50%,-50%) scale(0.8);
+            pointer-events:none;
+        }
+
+        /* 电子沿导线移动 */
+        .electron {
+            position:absolute; width:22px; height:22px;
+            background:linear-gradient(135deg,#00ffff,#00ccff);
+            border-radius:50%; display:flex; align-items:center; justify-content:center;
+            font-size:10px; font-weight:bold; color:#004050;
+            box-shadow:0 0 18px rgba(0,255,255,0.9),0 0 35px rgba(0,255,255,0.5),inset 0 2px 4px rgba(255,255,255,0.6);
+            top:74px; left:32%; z-index:10; animation:none;
+            border:2px solid rgba(255,255,255,0.7);
+        }
+        @keyframes move-electron-l2r {
+            0%{left:32%;transform:translateX(-50%) scale(0.8)} 50%{left:50%;transform:translateX(-50%) scale(1.3)} 100%{left:68%;transform:translateX(-50%) scale(0.8)}
+        }
+        @keyframes move-electron-r2l {
+            0%{left:68%;transform:translateX(-50%) scale(0.8)} 50%{left:50%;transform:translateX(-50%) scale(1.3)} 100%{left:32%;transform:translateX(-50%) scale(0.8)}
+        }
+
+        /* 结论面板 */
+        .conclusion-panel {
+            background:linear-gradient(180deg,rgba(35,55,85,0.95),rgba(25,45,75,0.95));
+            border-radius:18px; padding:28px; backdrop-filter:blur(12px);
+            border:1px solid rgba(255,255,255,0.12);
+            box-shadow:0 8px 24px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.1),inset 0 -1px 0 rgba(0,0,0,0.2);
+            display:flex; flex-direction:column; height:100%; min-height:0;
+        }
+        .conclusion-title { font-size:1.5rem; font-weight:700; color:#60a5fa; margin-bottom:24px; text-align:center; text-shadow:0 0 15px rgba(96,165,250,0.4); padding-bottom:16px; border-bottom:2px solid rgba(96,165,250,0.2); flex-shrink:0; }
+        .conclusion-content { flex-grow:1; display:flex; flex-direction:column; gap:22px; overflow-y:auto; padding-right:8px; min-height:0; scrollbar-width:thin; scrollbar-color:rgba(96,165,250,0.4) rgba(255,255,255,0.02); }
+        .conclusion-content::-webkit-scrollbar { width:4px; }
+        .conclusion-content::-webkit-scrollbar-track { background:rgba(255,255,255,0.02); border-radius:2px; }
+        .conclusion-content::-webkit-scrollbar-thumb { background:rgba(96,165,250,0.4); border-radius:2px; }
+
+        .status-card { background:linear-gradient(180deg,rgba(12,28,48,0.7),rgba(8,20,38,0.7)); border-radius:14px; padding:22px; border:1px solid rgba(255,255,255,0.08); box-shadow:0 4px 12px rgba(0,0,0,0.25),inset 0 1px 0 rgba(255,255,255,0.05); flex-shrink:0; }
+        .status-title { color:#e2e8f0; font-size:1.15rem; margin-bottom:16px; font-weight:600; text-shadow:0 1px 2px rgba(0,0,0,0.3); }
+        .polarity-display { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:20px; }
+        .pole { text-align:center; padding:18px; border-radius:12px; background:linear-gradient(180deg,rgba(20,35,60,0.4),rgba(15,28,50,0.4)); border:1px solid rgba(255,255,255,0.08); box-shadow:0 4px 10px rgba(0,0,0,0.2),inset 0 1px 0 rgba(255,255,255,0.05); transition:transform 0.3s ease; }
+        .pole:hover { transform:translateY(-2px); }
+        .pole-label { font-size:0.95rem; color:#94a3b8; margin-bottom:10px; font-weight:500; }
+        .pole-value { font-size:1.5rem; font-weight:700; }
+        .pole-negative { border-color:rgba(251,191,36,0.3); }
+        .pole-negative .pole-value { color:#fbbf24; text-shadow:0 0 15px rgba(251,191,36,0.6); }
+        .pole-positive { border-color:rgba(96,165,250,0.3); }
+        .pole-positive .pole-value { color:#60a5fa; text-shadow:0 0 15px rgba(96,165,250,0.6); }
+
+        .reaction-equations { margin-top:12px; }
+        .reaction-title { color:#e2e8f0; font-size:1.05rem; margin-bottom:12px; font-weight:600; }
+        .reaction { font-family:'Cambria','Times New Roman',serif; font-size:1.4rem; margin:14px 0; padding:14px; background:linear-gradient(180deg,rgba(15,28,48,0.4),rgba(10,20,38,0.4)); border-radius:10px; border-left:5px solid; word-break:break-word; line-height:1.5; box-shadow:0 3px 8px rgba(0,0,0,0.2),inset 0 1px 0 rgba(255,255,255,0.05); }
+        .reaction-negative { border-left-color:#fbbf24; color:#fbbf24; text-shadow:0 0 8px rgba(251,191,36,0.3); }
+        .reaction-positive { border-left-color:#60a5fa; color:#60a5fa; text-shadow:0 0 8px rgba(96,165,250,0.3); }
+
+        .warning-message { background:linear-gradient(180deg,rgba(180,30,30,0.25),rgba(150,25,25,0.25)); border:2px solid rgba(220,50,50,0.6); border-radius:14px; padding:22px; color:#fca5a5; font-size:1.1rem; font-weight:600; text-align:center; margin-top:20px; display:none; flex-shrink:0; box-shadow:0 6px 16px rgba(180,30,30,0.3),inset 0 1px 0 rgba(255,255,255,0.1); }
+        .warning-message.show { display:block; animation:pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,0.4)} 50%{box-shadow:0 0 0 10px rgba(220,38,38,0)} }
+
+        .chemical-insight { margin-top:22px; padding:18px; background:linear-gradient(180deg,rgba(12,35,55,0.6),rgba(8,28,45,0.6)); border-radius:12px; border:1px solid rgba(34,211,238,0.15); flex-shrink:0; box-shadow:0 4px 12px rgba(0,0,0,0.2),inset 0 1px 0 rgba(255,255,255,0.05); }
+        .insight-title { color:#22d3ee; font-size:1.05rem; margin-bottom:12px; font-weight:600; text-shadow:0 0 10px rgba(34,211,238,0.4); }
+        .insight-content { color:#cbd5e1; font-size:1rem; line-height:1.6; max-height:180px; overflow-y:auto; padding-right:8px; }
+        .insight-content::-webkit-scrollbar { width:3px; }
+        .insight-content::-webkit-scrollbar-track { background:rgba(255,255,255,0.02); border-radius:2px; }
+        .insight-content::-webkit-scrollbar-thumb { background:rgba(34,211,238,0.4); border-radius:2px; }
+
+        .footer-info { text-align:center; margin-top:24px; padding-top:20px; border-top:1px solid rgba(255,255,255,0.1); color:#94a3b8; font-size:0.9rem; flex-shrink:0; line-height:1.5; }
+
+        @media (max-width:1500px) { .lab-container { max-width:95%; grid-template-columns:270px 1.4fr 350px; } }
+        @media (max-width:1200px) { .lab-container { grid-template-columns:250px 1.2fr 320px; } }
+        @media (max-height:800px) { .lab-container { padding:20px; min-height:90vh; } .conclusion-content { gap:18px; } .status-card { padding:18px; } }
+        @media (max-width:1000px) { .order-item { font-size:0.7rem; padding:4px 1px; } }
+    </style>
+</head>
+<body>
+    <div class="lab-container">
+        <div class="lab-title">原电池工作原理仿真实验平台</div>
+        <!-- 左侧控制面板 -->
+        <div class="control-panel">
+            <div class="panel-title">⚗️ 实验控制台</div>
+            <div class="control-group">
+                <label class="control-label">左侧电极材料</label>
+                <select class="material-select" id="leftElectrode">
+                    <option value="mg">镁 (Mg)</option>
+                    <option value="al">铝 (Al)</option>
+                    <option value="zn" selected>锌 (Zn)</option>
+                    <option value="fe">铁 (Fe)</option>
+                    <option value="pb">铅 (Pb)</option>
+                    <option value="cu">铜 (Cu)</option>
+                    <option value="ag">银 (Ag)</option>
+                    <option value="pt">铂 (Pt)</option>
+                    <option value="c">石墨 (C)</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label class="control-label">右侧电极材料</label>
+                <select class="material-select" id="rightElectrode">
+                    <option value="mg">镁 (Mg)</option>
+                    <option value="al">铝 (Al)</option>
+                    <option value="zn">锌 (Zn)</option>
+                    <option value="fe">铁 (Fe)</option>
+                    <option value="pb">铅 (Pb)</option>
+                    <option value="cu" selected>铜 (Cu)</option>
+                    <option value="ag">银 (Ag)</option>
+                    <option value="pt">铂 (Pt)</option>
+                    <option value="c">石墨 (C)</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label class="control-label">电解质溶液</label>
+                <select class="material-select" id="electrolyteSelect">
+                    <option value="seawater" selected>海水</option>
+                    <option value="hcl">盐酸 (HCl)</option>
+                    <option value="h2so4">硫酸 (H₂SO₄)</option>
+                    <option value="cuso4">硫酸铜溶液 (CuSO₄)</option>
+                    <option value="agno3">硝酸银溶液 (AgNO₃)</option>
+                    <option value="fe2so43">硫酸铁溶液 [Fe₂(SO₄)₃]</option>
+                    <option value="fecl2">氯化亚铁溶液 (FeCl₂)</option>
+                    <option value="fecl3">氯化铁溶液 (FeCl₃)</option>
+                </select>
+            </div>
+            <div class="activity-order">
+                <h3>🔬 金属活动性顺序</h3>
+                <div class="order-list" id="activityOrder">
+                    <div class="order-item" data-metal="mg">Mg</div>
+                    <div class="order-item" data-metal="al">Al</div>
+                    <div class="order-item" data-metal="zn">Zn</div>
+                    <div class="order-item" data-metal="fe">Fe</div>
+                    <div class="order-item" data-metal="pb">Pb</div>
+                    <div class="order-item" data-metal="cu">Cu</div>
+                    <div class="order-item" data-metal="ag">Ag</div>
+                    <div class="order-item" data-metal="pt">Pt</div>
+                    <div class="order-item" data-metal="c">C</div>
+                </div>
+                <div class="activity-arrow"></div>
+                <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:0.8rem;color:#94a3b8;padding:0 4px;"><span>强</span><span>弱</span></div>
+            </div>
+        </div>
+
+        <!-- 中央仿真区 -->
+        <div class="simulation-area">
+            <!-- 正极/负极侧标 - 紧贴烧杯 -->
+            <div class="pole-side-label side-left is-negative" id="leftSideLabel">负极</div>
+            <div class="pole-side-label side-right is-positive" id="rightSideLabel">正极</div>
+
+            <div class="beaker-container">
+                <!-- 顶部电流显示器 - 在灯泡上方 -->
+                <div class="current-display-top">
+                    <div class="c-label">当前电流为：</div>
+                    <div class="c-value" id="currentValue">0.00 mA</div>
+                </div>
+                <!-- 烧杯 -->
+                <div class="beaker-glass">
+                    <div class="electrolyte" id="electrolyteFill"></div>
+                    <div class="ion-migration" id="ionMigration">
+                        <div class="ion-direction" id="ionDirection">→</div>
+                    </div>
+                </div>
+
+                <!-- 电极（已加高，顶部伸出液面） -->
+                <div class="electrode electrode-left" id="leftElectrodeElement"></div>
+                <div class="electrode electrode-right" id="rightElectrodeElement"></div>
+
+                <!-- 电极标签（在上方，在导线之上） -->
+                <div class="electrode-label electrode-label-left" id="leftElectrodeLabel">Zn</div>
+                <div class="electrode-label electrode-label-right" id="rightElectrodeLabel">Cu</div>
+
+                <!-- 粒子容器 -->
+                <div class="particles-container" id="particlesContainer"></div>
+
+                <!-- 电路 -->
+                <div class="circuit-system">
+                    <div class="wire wire-left" id="wireLeft"></div>
+                    <div class="wire wire-right" id="wireRight"></div>
+                    <div class="wire wire-top-left" id="wireTopLeft"></div>
+                    <div class="wire wire-top-right" id="wireTopRight"></div>
+                    <div class="wire-dot wire-dot-left" id="wireDotLeft"></div>
+                    <div class="wire-dot wire-dot-right" id="wireDotRight"></div>
+                    <div class="bulb bulb-off" id="bulb">💡</div>
+                    <div class="electron" id="electron">e⁻</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧结论面板 -->
+        <div class="conclusion-panel">
+            <div class="conclusion-title">📊 实验结论</div>
+            <div class="conclusion-content">
+                <div class="status-card">
+                    <div class="status-title">🔋 原电池状态</div>
+                    <div class="polarity-display">
+                        <div class="pole pole-negative">
+                            <div class="pole-label">负极（溶解）</div>
+                            <div class="pole-value" id="negativePole">-</div>
+                        </div>
+                        <div class="pole pole-positive">
+                            <div class="pole-label">正极（冒泡）</div>
+                            <div class="pole-value" id="positivePole">-</div>
+                        </div>
+                    </div>
+                    <div style="text-align:center;margin-top:10px;color:#94a3b8;font-size:0.95rem;">
+                        电解质：<span id="electrolyteName">海水</span>
+                    </div>
+                </div>
+                <div class="status-card">
+                    <div class="status-title">⚡ 电极反应式</div>
+                    <div class="reaction-equations">
+                        <div class="reaction reaction-negative" id="negativeReaction">等待实验...</div>
+                        <div class="reaction reaction-positive" id="positiveReaction">等待实验...</div>
+                    </div>
+                </div>
+                <div class="warning-message" id="warningMessage">⚠️ 警告：电极材料无法形成原电池！</div>
+                <div class="chemical-insight">
+                    <div class="insight-title">💡 化学洞察</div>
+                    <div class="insight-content" id="insightContent">选择不同电极材料和电解质开始实验...</div>
+                </div>
+            </div>
+            <div class="footer-info">
+                原电池虚拟交互实验室 | 高中化学数字化教学工具<br>
+                v8.0 | 基于原生HTML5/CSS3/JavaScript
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========== 数据 ==========
+        const electrodeData = {
+            'mg':{name:'镁',symbol:'Mg',activity:8,electrons:2,type:'metal'},
+            'al':{name:'铝',symbol:'Al',activity:7,electrons:3,type:'metal'},
+            'zn':{name:'锌',symbol:'Zn',activity:6,electrons:2,type:'metal'},
+            'fe':{name:'铁',symbol:'Fe',activity:5,electrons:2,type:'metal'},
+            'pb':{name:'铅',symbol:'Pb',activity:4,electrons:2,type:'metal'},
+            'cu':{name:'铜',symbol:'Cu',activity:3,electrons:2,type:'metal'},
+            'ag':{name:'银',symbol:'Ag',activity:2,electrons:1,type:'metal'},
+            'pt':{name:'铂',symbol:'Pt',activity:1,electrons:0,type:'inert'},
+            'c':{name:'石墨',symbol:'C',activity:0,electrons:0,type:'inert'}
+        };
+        const ionColors = {
+            'mg':'rgba(200,220,240,0.9)','al':'rgba(180,190,200,0.9)','zn':'rgba(180,190,210,0.9)',
+            'fe':'rgba(180,150,120,0.9)','pb':'rgba(160,160,175,0.9)','cu':'rgba(200,120,40,0.9)',
+            'ag':'rgba(200,210,220,0.9)','pt':null,'c':null
+        };
+        const electrolyteData = {
+            'seawater':{name:'海水',color:'linear-gradient(180deg,rgba(14,165,233,0.85),rgba(56,189,248,0.75) 50%,rgba(125,211,252,0.65) 100%)',conductivity:0.5,cathodicReaction:'O₂ + 2H₂O + 4e⁻ → 4OH⁻',cathodicLabel:'吸氧腐蚀（中性环境）'},
+            'hcl':{name:'盐酸',color:'linear-gradient(180deg,rgba(210,235,255,0.25),rgba(200,225,250,0.15) 50%,rgba(190,215,245,0.08) 100%)',conductivity:0.9,cathodicReaction:'2H⁺ + 2e⁻ → H₂↑',cathodicLabel:'析氢反应（酸性环境）'},
+            'h2so4':{name:'硫酸',color:'linear-gradient(180deg,rgba(235,245,255,0.22),rgba(225,238,250,0.12) 50%,rgba(215,230,245,0.06) 100%)',conductivity:0.9,cathodicReaction:'2H⁺ + 2e⁻ → H₂↑',cathodicLabel:'析氢反应（酸性环境）'},
+            'cuso4':{name:'硫酸铜溶液',color:'linear-gradient(180deg,rgba(20,80,210,0.85),rgba(30,110,200,0.75) 50%,rgba(50,140,180,0.65) 100%)',conductivity:0.6,cathodicReaction:'Cu²⁺ + 2e⁻ → Cu',cathodicLabel:'铜离子还原析出'},
+            'agno3':{name:'硝酸银溶液',color:'linear-gradient(180deg,rgba(235,245,255,0.28),rgba(225,238,250,0.16) 50%,rgba(218,232,248,0.10) 100%)',conductivity:0.5,cathodicReaction:'Ag⁺ + e⁻ → Ag',cathodicLabel:'银离子还原析出'},
+            'fe2so43':{name:'硫酸铁溶液',color:'linear-gradient(180deg,rgba(210,150,30,0.75),rgba(200,140,40,0.65) 50%,rgba(180,130,45,0.55) 100%)',conductivity:0.5,cathodicReaction:'Fe³⁺ + e⁻ → Fe²⁺',cathodicLabel:'铁离子还原（Fe³⁺→Fe²⁺）'},
+            'fecl2':{name:'氯化亚铁溶液',color:'linear-gradient(180deg,rgba(90,190,100,0.65),rgba(110,185,115,0.55) 50%,rgba(125,175,125,0.45) 100%)',conductivity:0.55,cathodicReaction:'Fe²⁺ + 2e⁻ → Fe',cathodicLabel:'亚铁离子还原析出'},
+            'fecl3':{name:'氯化铁溶液',color:'linear-gradient(180deg,rgba(210,155,35,0.75),rgba(200,145,45,0.65) 50%,rgba(190,135,50,0.55) 100%)',conductivity:0.55,cathodicReaction:'Fe³⁺ + e⁻ → Fe²⁺',cathodicLabel:'铁离子还原（Fe³⁺→Fe²⁺）'}
+        };
+
+        // ========== DOM ==========
+        const $ = id => document.getElementById(id);
+        const leftElectrodeSelect = $('leftElectrode'), rightElectrodeSelect = $('rightElectrode'), electrolyteSelect = $('electrolyteSelect');
+        const leftElectrodeElement = $('leftElectrodeElement'), rightElectrodeElement = $('rightElectrodeElement');
+        const leftElectrodeLabel = $('leftElectrodeLabel'), rightElectrodeLabel = $('rightElectrodeLabel');
+        const electrolyteFill = $('electrolyteFill'), electrolyteName = $('electrolyteName');
+        const electron = $('electron'), bulb = $('bulb'), currentValueDisplay = $('currentValue');
+        const negativePoleDisplay = $('negativePole'), positivePoleDisplay = $('positivePole');
+        const negativeReactionDisplay = $('negativeReaction'), positiveReactionDisplay = $('positiveReaction');
+        const warningMessage = $('warningMessage'), insightContent = $('insightContent');
+        const particlesContainer = $('particlesContainer'), activityOrderItems = document.querySelectorAll('.order-item');
+        const leftSideLabel = $('leftSideLabel'), rightSideLabel = $('rightSideLabel');
+        const ionMigrationContainer = $('ionMigration'), ionDirection = $('ionDirection');
+        const wireLeft = $('wireLeft'), wireRight = $('wireRight'), wireTopLeft = $('wireTopLeft'), wireTopRight = $('wireTopRight');
+        const wireDotLeft = $('wireDotLeft'), wireDotRight = $('wireDotRight');
+
+        let currentBubbleInterval = null, currentIonInterval = null, currentIonMigrateInterval = null;
+
+        function init() {
+            updateExperiment();
+            leftElectrodeSelect.addEventListener('change', updateExperiment);
+            rightElectrodeSelect.addEventListener('change', updateExperiment);
+            electrolyteSelect.addEventListener('change', updateExperiment);
+            updateActivityOrderHighlight();
+        }
+
+        function updateExperiment() {
+            const leftMetal = leftElectrodeSelect.value, rightMetal = rightElectrodeSelect.value, electrolyte = electrolyteSelect.value;
+            updateElectrodeAppearance(leftMetal, rightMetal);
+            updateElectrolyteColor(electrolyte);
+            electrolyteName.textContent = electrolyteData[electrolyte].name;
+            const batteryData = calculateBattery(leftMetal, rightMetal, electrolyte);
+            updateSideLabels(batteryData);
+            updateDisplays(batteryData, electrolyte);
+            updateAnimations(batteryData);
+            updateIonMigration(batteryData, electrolyte);
+            updateChemicalInsight(batteryData, electrolyte);
+            updateActivityOrderHighlight();
+        }
+
+        function updateElectrodeAppearance(leftMetal, rightMetal) {
+            leftElectrodeElement.className = `electrode electrode-left electrode-${leftMetal}`;
+            rightElectrodeElement.className = `electrode electrode-right electrode-${rightMetal}`;
+            leftElectrodeLabel.textContent = electrodeData[leftMetal].symbol;
+            rightElectrodeLabel.textContent = electrodeData[rightMetal].symbol;
+        }
+
+        function updateElectrolyteColor(electrolyte) {
+            electrolyteFill.style.background = electrolyteData[electrolyte].color;
+        }
+
+        function updateSideLabels(batteryData) {
+            if (batteryData.isBattery) {
+                const negIsLeft = batteryData.negativePole === leftElectrodeSelect.value;
+                leftSideLabel.textContent = negIsLeft ? '负极' : '正极';
+                leftSideLabel.className = `pole-side-label side-left ${negIsLeft ? 'is-negative' : 'is-positive'}`;
+                rightSideLabel.textContent = negIsLeft ? '正极' : '负极';
+                rightSideLabel.className = `pole-side-label side-right ${negIsLeft ? 'is-positive' : 'is-negative'}`;
+            } else {
+                leftSideLabel.textContent = '-'; rightSideLabel.textContent = '-';
+                leftSideLabel.className = 'pole-side-label side-left'; rightSideLabel.className = 'pole-side-label side-right';
+            }
+        }
+
+        function calculateBattery(leftMetal, rightMetal, electrolyte) {
+            const leftAct = electrodeData[leftMetal].activity, rightAct = electrodeData[rightMetal].activity;
+            const leftType = electrodeData[leftMetal].type, rightType = electrodeData[rightMetal].type;
+            if (leftType === 'inert' && rightType === 'inert') return {isBattery:false,reason:'both_inert',currentStrength:0};
+            if (leftMetal === rightMetal) return {isBattery:false,reason:'same_material',currentStrength:0};
+            let neg, pos;
+            if (leftAct > rightAct) { neg=leftMetal; pos=rightMetal; }
+            else if (rightAct > leftAct) { neg=rightMetal; pos=leftMetal; }
+            else return {isBattery:false,reason:'same_activity',currentStrength:0};
+            const diff = Math.abs(leftAct - rightAct);
+            return {isBattery:true, negativePole:neg, positivePole:pos, currentStrength: diff * 0.6 * electrolyteData[electrolyte].conductivity, activityDiff:diff};
+        }
+
+        function updateDisplays(batteryData, electrolyte) {
+            if (batteryData.isBattery) {
+                warningMessage.classList.remove('show');
+                negativePoleDisplay.textContent = electrodeData[batteryData.negativePole].name;
+                positivePoleDisplay.textContent = electrodeData[batteryData.positivePole].name;
+                updateReactionEquations(batteryData, electrolyte);
+            } else {
+                warningMessage.classList.add('show');
+                let t = '';
+                if (batteryData.reason === 'both_inert') t = '⚠️ 警告：石墨和铂均为惰性电极，无法形成原电池！请至少选择一种活泼金属。';
+                else if (batteryData.reason === 'same_material') t = '⚠️ 警告：电极材料相同，无法形成电势差，不能构成原电池！';
+                else t = '⚠️ 警告：无法形成原电池！请选择不同电极材料。';
+                warningMessage.textContent = t;
+                negativePoleDisplay.textContent = positivePoleDisplay.textContent = '-';
+                negativeReactionDisplay.textContent = positiveReactionDisplay.textContent = '—';
+            }
+        }
+
+        function updateReactionEquations(batteryData, electrolyte) {
+            const m = electrodeData[batteryData.negativePole], e = electrolyteData[electrolyte];
+            let r;
+            if (m.type === 'inert') r = '（惰性电极，不参与反应）';
+            else if (m.electrons === 1) r = `${m.symbol} - e⁻ → ${m.symbol}⁺`;
+            else if (m.electrons === 2) r = `${m.symbol} - 2e⁻ → ${m.symbol}²⁺`;
+            else if (m.electrons === 3) r = `${m.symbol} - 3e⁻ → ${m.symbol}³⁺`;
+            else r = `${m.symbol} - ${m.electrons}e⁻ → ${m.symbol}ⁿ⁺`;
+            negativeReactionDisplay.textContent = r;
+            positiveReactionDisplay.textContent = e.cathodicReaction;
+        }
+
+        // ===== 导线颜色 =====
+        function updateWireColors(batteryData) {
+            const elems = [wireLeft, wireRight, wireTopLeft, wireTopRight, wireDotLeft, wireDotRight];
+            if (!batteryData || !batteryData.isBattery) {
+                elems.forEach(el => { el.classList.remove('wire-neg', 'wire-pos'); });
+                return;
+            }
+            const negIsLeft = batteryData.negativePole === leftElectrodeSelect.value;
+            const negWire = negIsLeft ? [wireLeft, wireTopLeft, wireDotLeft] : [wireRight, wireTopRight, wireDotRight];
+            const posWire = negIsLeft ? [wireRight, wireTopRight, wireDotRight] : [wireLeft, wireTopLeft, wireDotLeft];
+            elems.forEach(el => el.classList.remove('wire-neg', 'wire-pos'));
+            negWire.forEach(el => el.classList.add('wire-neg'));
+            posWire.forEach(el => el.classList.add('wire-pos'));
+        }
+
+        // ===== 动画（灯泡 + 气泡 + 溶解粒子） =====
+        function updateAnimations(batteryData) {
+            clearAnimations();
+
+            if (!batteryData.isBattery || batteryData.currentStrength <= 0) {
+                bulb.className = 'bulb bulb-off';
+                bulb.style.textShadow = ''; bulb.style.filter = '';
+                bulb.style.opacity = ''; bulb.style.transform = '';
+                electron.style.animation = 'none'; electron.style.opacity = '0.3';
+                currentValueDisplay.textContent = '0.00 mA';
+                updateWireColors(null);
+                return;
+            }
+
+            const cur = batteryData.currentStrength;
+            const curMA = cur * 120;
+            currentValueDisplay.textContent = `${curMA.toFixed(2)} mA`;
+
+            // 灯泡亮度随电流变化
+            const brightness = Math.min(1, cur / 4);
+            const glow = 10 + brightness * 20;
+            bulb.className = 'bulb bulb-on';
+            bulb.style.textShadow = `0 0 ${glow}px #ffd700, 0 0 ${glow*2}px #ffd700, 0 0 ${glow*3}px #ffa500`;
+            bulb.style.filter = `drop-shadow(0 0 ${5+brightness*10}px rgba(255,215,0,0.85))`;
+            bulb.style.opacity = 0.3 + brightness * 0.7;
+            bulb.style.transform = `translate(-50%,-50%) scale(${1 + brightness * 0.08})`;
+
+            // 电子移动 - 从活泼性强（负极）到活泼性弱（正极）
+            const speed = Math.max(0.8, 2.5 - cur * 0.5);
+            const negIsLeft = batteryData.negativePole === leftElectrodeSelect.value;
+            const animName = negIsLeft ? 'move-electron-l2r' : 'move-electron-r2l';
+            electron.style.opacity = '1';
+            electron.style.animation = `${animName} ${speed}s ease-in-out infinite`;
+
+            // 导线颜色
+            updateWireColors(batteryData);
+
+            // 正极冒泡
+            const isLeftPos = batteryData.positivePole === leftElectrodeSelect.value;
+            const bx = isLeftPos ? '35%' : '65%';
+            currentBubbleInterval = setInterval(() => createBubble(bx, cur), Math.max(200, 1000/(cur+0.3)));
+
+            // 负极溶解
+            const neg = batteryData.negativePole;
+            if (electrodeData[neg].type === 'metal' && ionColors[neg]) {
+                const isLeftNeg = neg === leftElectrodeSelect.value;
+                currentIonInterval = setInterval(() => createMetalIon(isLeftNeg ? '35%' : '65%', neg, cur), Math.max(150, 800/(cur+0.2)));
+            }
+        }
+
+        function clearAnimations() {
+            electron.style.animation = 'none';
+            if (currentBubbleInterval) { clearInterval(currentBubbleInterval); currentBubbleInterval = null; }
+            if (currentIonInterval) { clearInterval(currentIonInterval); currentIonInterval = null; }
+            clearIonMigration();
+            particlesContainer.innerHTML = '';
+        }
+
+        function createBubble(x, s) {
+            const b = document.createElement('div');
+            b.className = 'bubble';
+            const sz = Math.random()*6 + 4 + s*2;
+            Object.assign(b.style, {width:sz+'px', height:sz+'px', left:x, bottom:'40px'});
+            const d = Math.random()*1.5+0.8;
+            b.style.animationDuration = d+'s';
+            b.style.setProperty('--offset', (Math.random()-0.5)*20+'px');
+            particlesContainer.appendChild(b);
+            setTimeout(() => b.parentNode?.removeChild(b), d*1000);
+        }
+
+        function createMetalIon(x, mk, s) {
+            const ion = document.createElement('div');
+            ion.className = 'metal-ion';
+            const sz = Math.random()*4+2;
+            const c = ionColors[mk] || 'rgba(200,200,200,0.8)';
+            Object.assign(ion.style, {
+                width:sz+'px', height:sz+'px',
+                left:x, bottom:(60+Math.random()*200)+'px',
+                background:`radial-gradient(circle at 35% 35%,${c},${c.replace('0.9','0.5')})`
+            });
+            const dd = (x==='35%'?1:-1)*(20+Math.random()*40);
+            ion.style.setProperty('--ion-drift-x', dd+'px');
+            const d = Math.random()*2+1.5;
+            ion.style.animationDuration = d+'s';
+            particlesContainer.appendChild(ion);
+            setTimeout(() => ion.parentNode?.removeChild(ion), d*1000);
+        }
+
+        // ===== 电解质离子迁移动画 =====
+        const ionSymbols = {
+            'seawater':'Na⁺','hcl':'H⁺','h2so4':'H⁺','cuso4':'Cu²⁺',
+            'agno3':'Ag⁺','fe2so43':'Fe³⁺','fecl2':'Fe²⁺','fecl3':'Fe³⁺'
+        };
+
+        function updateIonMigration(batteryData, electrolyte) {
+            clearIonMigration();
+            if (!batteryData.isBattery) { ionDirection.textContent = ''; return; }
+
+            const isLeftPos = batteryData.positivePole === leftElectrodeSelect.value;
+            const dir = isLeftPos ? 'left' : 'right';
+            ionDirection.textContent = dir === 'right' ? '→' : '←';
+
+            const sym = ionSymbols[electrolyte] || 'H⁺';
+            const cw = ionMigrationContainer.offsetWidth || 230;
+
+            // 初始一批
+            for (let i = 0; i < 4; i++) setTimeout(() => createMigratingIon(sym, dir, cw), i * 500);
+
+            currentIonMigrateInterval = setInterval(() => createMigratingIon(sym, dir, cw), 900 + Math.random() * 300);
+        }
+
+        function createMigratingIon(sym, dir, cw) {
+            const el = document.createElement('div');
+            el.className = 'ion-particle'; el.textContent = sym;
+            const dur = 3000 + Math.random() * 2000;
+            const topOff = 4 + Math.random() * 20;
+            const startX = dir === 'right' ? -45 : cw + 5;
+            const endX = dir === 'right' ? cw + 5 : -45;
+            const colors = ['rgba(96,165,250,0.2)','rgba(129,140,248,0.2)','rgba(167,139,250,0.2)','rgba(52,211,153,0.2)'];
+            const bg = colors[Math.floor(Math.random() * colors.length)];
+
+            Object.assign(el.style, { left: startX + 'px', top: topOff + 'px', background: bg, transition: 'none' });
+            ionMigrationContainer.appendChild(el);
+            el.offsetHeight; // force reflow
+            el.style.transition = `left ${dur}ms linear, opacity 300ms ease`;
+            el.style.opacity = '1';
+            el.style.left = endX + 'px';
+
+            setTimeout(() => {
+                el.style.opacity = '0';
+                setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 300);
+            }, dur - 200);
+        }
+
+        function clearIonMigration() {
+            if (currentIonMigrateInterval) { clearInterval(currentIonMigrateInterval); currentIonMigrateInterval = null; }
+            const els = ionMigrationContainer.querySelectorAll('.ion-particle');
+            els.forEach(el => el.remove());
+        }
+
+        function updateActivityOrderHighlight() {
+            const lm = leftElectrodeSelect.value, rm = rightElectrodeSelect.value;
+            activityOrderItems.forEach(i => i.classList.remove('active'));
+            activityOrderItems.forEach(i => { const m=i.getAttribute('data-metal'); if(m===lm||m===rm) i.classList.add('active'); });
+        }
+
+        function updateChemicalInsight(batteryData, electrolyte) {
+            const e = electrolyteData[electrolyte];
+            if (!batteryData.isBattery) {
+                if (batteryData.reason==='both_inert') { insightContent.textContent='石墨和铂都是惰性电极，不能自发发生氧化还原反应。请用活泼金属替换其中之一（如锌、铁等）。'; return; }
+                if (batteryData.reason==='same_material') { insightContent.textContent='两种电极材料相同，没有电势差。需要选择两种不同活性的材料才能形成原电池。'; return; }
+                insightContent.textContent='两种材料活性相同，无法形成原电池。'; return;
+            }
+            const n = electrodeData[batteryData.negativePole], p = electrodeData[batteryData.positivePole], d = batteryData.activityDiff;
+            let t = d>=5 ? `活性差异很大（${d}级），产生较强电流。${n.symbol}为负极（阳极），持续溶解失去电子被氧化。` :
+                    d>=3 ? `活性差异中等（${d}级），产生稳定电流。${n.symbol}为负极（阳极），逐渐溶解失去电子。` :
+                    `活性差异较小（${d}级），产生较弱电流。${n.symbol}为负极（阳极），缓慢溶解失去电子。`;
+            if (p.type==='inert') t += ` ${p.symbol}为惰性电极，不参与反应，仅起导电作用。`;
+            if (n.type==='metal') t += ` 负极金属离子进入溶液，正极发生${e.cathodicLabel}。`;
+            insightContent.textContent = t;
+        }
+
+        window.addEventListener('DOMContentLoaded', init);
+
+        const s = document.createElement('style');
+        s.textContent = `@keyframes bubble-rise{0%{transform:translateY(0)translateX(0)scale(0.3);opacity:0.85}50%{opacity:0.6}100%{transform:translateY(-180px)translateX(var(--offset,0))scale(0.9);opacity:0}}@keyframes ion-drift{0%{transform:translateY(0)translateX(0)scale(0.6);opacity:0.9}30%{opacity:0.7}60%{opacity:0.4}100%{transform:translateY(-80px)translateX(var(--ion-drift-x,30px))scale(0.2);opacity:0}}`;
+        document.head.appendChild(s);
+    </script>
+</body>
+</html>
